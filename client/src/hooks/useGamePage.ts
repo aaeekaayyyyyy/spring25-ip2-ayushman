@@ -20,12 +20,27 @@ const useGamePage = () => {
   // - `gameState` to store the current game state or null if no game is joined.
   // - `joinedGameID` to store the ID of the joined game.
   // - `error` to display any error messages related to the game, or null if no error message.
+  const [gameState, setGameState] = useState<GameInstance | null>(null);
+  const [joinedGameID, setJoinedGameID] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const handleLeaveGame = async () => {
     // TODO: Task 2 - Implement the logic to leave the current game.
     // - If a game is joined and not over, make the appropriate API call to leave the game, and
     // emit a 'leaveGame' event to the server using the socket.
 
+    if (joinedGameID && gameState && gameState.state.status !== 'OVER') {
+      try {
+        await leaveGame(joinedGameID, user.username);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        socket.emit('leaveGame', { gameID: joinedGameID, username: user.username } as any);
+        setGameState(null);
+        setJoinedGameID(null);
+      } catch (err) {
+        setError('Failed to leave the game.');
+        console.error(err);
+      }
+    }
     // Always navigate back to the games page
     navigate('/games');
   };
@@ -35,6 +50,17 @@ const useGamePage = () => {
       // TODO: Task 2 - Implement the logic to join the game with the provided ID,
       // making an API call, emitting a 'joinGame' event to the server using the socket,
       // and setting apporoiate state variables.
+      try {
+        const joinedGame = await joinGame(id, user.username);
+        setGameState(joinedGame);
+        setJoinedGameID(id);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        socket.emit('joinGame', { gameID: id, username: user.username } as any);
+        setError(null);
+      } catch (err) {
+        setError('Failed to join the game.');
+        console.error(err);
+      }
     };
 
     if (gameID) {
@@ -43,16 +69,26 @@ const useGamePage = () => {
 
     const handleGameUpdate = (updatedState: GameUpdatePayload) => {
       // TODO: Task 2 - Update the game state based on the received update
+      if (updatedState.gameState.gameID === joinedGameID) {
+        setGameState(updatedState.gameState);
+      }
     };
 
     const handleGameError = (gameError: GameErrorPayload) => {
       // TODO: Task 2 - Display the error if this user caused the error
+      if (gameError.player === user.username) {
+        setError(gameError.error);
+      }
     };
 
     // TODO: Task 2 - Register socket listeners for 'gameUpdate' and 'gameError' events
+    socket.on('gameUpdate', handleGameUpdate);
+    socket.on('gameError', handleGameError);
 
     return () => {
       // TODO: Task 2 -  Unsubscribe from the socket event on cleanup
+      socket.off('gameUpdate', handleGameUpdate);
+      socket.off('gameError', handleGameError);
     };
   }, [gameID, socket, user.username]);
 

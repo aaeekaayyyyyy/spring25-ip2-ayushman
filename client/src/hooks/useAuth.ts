@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { ChangeEvent, useState } from 'react';
+import { AxiosError } from 'axios';
 import useLoginContext from './useLoginContext';
 import { createUser, loginUser } from '../services/userService';
 import { User } from '../types';
@@ -34,6 +35,7 @@ const useAuth = (authType: 'login' | 'signup') => {
    */
   const togglePasswordVisibility = () => {
     // TODO - Task 1: Toggle password visibility
+    setShowPassword(prev => !prev);
   };
 
   /**
@@ -47,6 +49,20 @@ const useAuth = (authType: 'login' | 'signup') => {
     field: 'username' | 'password' | 'confirmPassword',
   ) => {
     // TODO - Task 1: Handle input changes for the fields
+    const { value } = e.target;
+    switch (field) {
+      case 'username':
+        setUsername(value);
+        break;
+      case 'password':
+        setPassword(value);
+        break;
+      case 'confirmPassword':
+        setPasswordConfirmation(value);
+        break;
+      default:
+        console.warn(`Unhandled input field: ${field}`);
+    }
   };
 
   /**
@@ -58,6 +74,18 @@ const useAuth = (authType: 'login' | 'signup') => {
   const validateInputs = (): boolean => {
     // TODO - Task 1: Validate inputs for login and signup forms
     // Display any errors to the user
+    if (!username.trim() || !password.trim()) {
+      setErr('Username and password are required.');
+      return false;
+    }
+
+    if (authType === 'signup' && password !== passwordConfirmation) {
+      setErr('Passwords do not match.');
+      return false;
+    }
+
+    setErr('');
+    return true;
   };
 
   /**
@@ -71,17 +99,27 @@ const useAuth = (authType: 'login' | 'signup') => {
 
     // TODO - Task 1: Validate inputs
 
-    let user: User;
+    if (!validateInputs()) return;
 
     try {
       // TODO - Task 1: Handle the form submission, calling appropriate API routes
       // based on the auth type
+      let user: User;
+      if (authType === 'login') {
+        user = await loginUser({ username, password });
+      } else {
+        user = await createUser({ username, password });
+      }
 
       // Redirect to home page on successful login/signup
       setUser(user);
       navigate('/home');
     } catch (error) {
       // TODO - Task 1: Display error message
+      const axiosError = error as AxiosError<{ message: string }>;
+      const message =
+        axiosError.response?.data?.message || 'An error occurred during authentication.';
+      setErr(message);
     }
   };
 

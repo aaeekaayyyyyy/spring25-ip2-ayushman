@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import useUserContext from './useUserContext';
-import { GameInstance } from '../types';
+import { GameInstance, GameMove } from '../types';
 
 /**
  * Custom hook to manage the state and logic for the "Nim" game page,
@@ -17,9 +17,29 @@ const useNimGamePage = (gameState: GameInstance) => {
   const { user, socket } = useUserContext();
 
   // TODO: Task 2 - Define the state variable to store the current move (`move`)
+  const [move, setMove] = useState<number | ''>('');
 
   const handleMakeMove = async () => {
     // TODO: Task 2 - Emit a socket event to make a move in the Nim game
+    if (!user || move === '' || move < 1 || move > 3) return;
+
+    // Construct the move payload according to your GameMove interface
+    const gameMove: GameMove = {
+      gameID: gameState.gameID,
+      move: {
+        playerID: user.username,
+        gameID: gameState.gameID,
+        move: {
+          numObjects: move,
+        },
+      },
+    };
+
+    // Emit the 'makeMove' event with the move object
+    socket.emit('makeMove', gameMove);
+
+    // Optionally reset move input
+    setMove('');
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -28,6 +48,16 @@ const useNimGamePage = (gameState: GameInstance) => {
     // updating the state.
 
     const { value } = e.target;
+    // Parse input as integer
+    const parsed = parseInt(value, 10);
+
+    // Validate move to be between 1 and 3
+    if (!Number.isNaN(parsed) && parsed >= 1 && parsed <= 3) {
+      setMove(parsed);
+    } else if (value === '') {
+      // Allow clearing input
+      setMove('');
+    }
   };
 
   return {

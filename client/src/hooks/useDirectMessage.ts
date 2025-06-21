@@ -18,6 +18,9 @@ const useDirectMessage = () => {
 
   const handleJoinChat = (chatID: string) => {
     // TODO: Task 3 - Emit a 'joinChat' event to the socket with the chat ID function argument.
+    if (socket && chatID) {
+      socket.emit('joinChat', chatID);
+    }
   };
 
   const handleSendMessage = async () => {
@@ -25,6 +28,23 @@ const useDirectMessage = () => {
     // Whitespace-only messages should not be sent, and the current chat to send this message to
     // should be defined. Use the appropriate service function to make an API call, and update the
     // states accordingly.
+    if (!newMessage.trim() || !selectedChat?._id || !user?._id) return;
+
+    try {
+      const updatedChat = await sendMessage(
+        {
+          msg: newMessage.trim(),
+          msgFrom: user._id,
+          msgDateTime: new Date(),
+        },
+        selectedChat._id,
+      );
+
+      setSelectedChat(updatedChat);
+      setNewMessage('');
+    } catch (error) {
+      console.error('Failed to send message:', error);
+    }
   };
 
   const handleChatSelect = async (chatID: string | undefined) => {
@@ -32,6 +52,15 @@ const useDirectMessage = () => {
     // If the chat ID is defined, fetch the chat details using the appropriate service function,
     // and update the appropriate state variables. Make sure the client emits a socket event to
     // subscribe to the chat room.
+    if (!chatID || !socket) return;
+
+    try {
+      const chat = await getChatById(chatID);
+      setSelectedChat(chat);
+      handleJoinChat(chatID); // Subscribe to socket room
+    } catch (error) {
+      console.error('Failed to select chat:', error);
+    }
   };
 
   const handleUserSelect = (selectedUser: User) => {
@@ -43,11 +72,31 @@ const useDirectMessage = () => {
     // If the username to create a chat is defined, use the appropriate service function to create a new chat
     // between the current user and the chosen user. Update the appropriate state variables and emit a socket
     // event to join the chat room. Hide the create panel after creating the chat.
+    if (!chatToCreate.trim()) return;
+
+    console.log('chattttt......', chatToCreate);
+
+    try {
+      const newChat = await createChat([chatToCreate.trim()]);
+      setChats(prevChats => [...prevChats, newChat]);
+      setSelectedChat(newChat);
+      handleJoinChat(newChat._id);
+      setShowCreatePanel(false);
+      setChatToCreate('');
+    } catch (error) {
+      console.error('Failed to create chat:', error);
+    }
   };
 
   useEffect(() => {
     const fetchChats = async () => {
       // TODO: Task 3 - Fetch all the chats with the current user and update the state variable.
+      try {
+        const allChats = await getChatsByUser(user.username);
+        setChats(allChats);
+      } catch (error) {
+        console.error('Failed to fetch chats:', error);
+      }
     };
 
     const handleChatUpdate = (chatUpdate: ChatUpdatePayload) => {
@@ -59,16 +108,32 @@ const useDirectMessage = () => {
       // - Throw an error for an invalid chatUpdate type
       // NOTE: For new messages, the user will only receive the update if they are
       // currently subscribed to the chat room.
+      const { chat, type } = chatUpdate;
+
+      if (type === 'created') {
+        setChats(prev => [...prev, chat]);
+      } else if (type === 'newMessage') {
+        if (selectedChat && chat._id === selectedChat._id) {
+          setSelectedChat(chat);
+        }
+      } else {
+        throw new Error(`Invalid chatUpdate type: ${type}`);
+      }
     };
 
     fetchChats();
 
     // TODO: Task 3 - Register the 'chatUpdate' event listener
+    socket?.on('chatUpdate', handleChatUpdate);
 
     return () => {
       // TODO: Task 3 - Unsubscribe from the socket event
       // TODO: Task 3 - Emit a socket event to leave the particular chat room
       // they are currently in when the component unmounts.
+      socket?.off('chatUpdate', handleChatUpdate);
+      if (selectedChat?._id) {
+        socket.emit('leaveChat', selectedChat._id);
+      }
     };
   }, [user.username, socket, selectedChat?._id]);
 

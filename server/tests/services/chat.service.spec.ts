@@ -29,7 +29,6 @@ describe('Chat service', () => {
   describe('saveChat', () => {
     // TODO: Task 3 - Write tests for the saveChat function
 
-
     it('should successfully save a chat and verify its body (ignore exact IDs)', async () => {
       // 2) Mock message creation
       mockingoose(MessageModel).toReturn(
@@ -54,6 +53,16 @@ describe('Chat service', () => {
         },
         'create',
       );
+
+      const mockChatPayload = {
+        participants: ['testUser'],
+        message: {
+          msg: 'Hello!',
+          msgFrom: 'testUser',
+          msgDateTime: new Date('2025-01-01T00:00:00Z'),
+          type: 'direct',
+        },
+      };
 
       // 4) Call the service
       const result = await saveChat(mockChatPayload);
@@ -137,7 +146,6 @@ describe('Chat service', () => {
     });
   });
 
-
   // ----------------------------------------------------------------------------
   // 5. addParticipantToChat
   // ----------------------------------------------------------------------------
@@ -189,7 +197,11 @@ describe('Chat service', () => {
 
       mockingoose(ChatModel).toReturn([mockChats[0]], 'find');
 
-      const result = await getChatsByParticipants(['user1', 'user2']);
+      const user1 = new mongoose.Types.ObjectId();
+      const user2 = new mongoose.Types.ObjectId();
+      const user3 = new mongoose.Types.ObjectId();
+
+      const result = await getChatsByParticipants([user1, user2]);
       expect(result).toHaveLength(1);
       expect(result).toEqual([mockChats[0]]);
     });
@@ -220,30 +232,31 @@ describe('Chat service', () => {
       ];
 
       mockingoose(ChatModel).toReturn([mockChats[0], mockChats[1]], 'find');
+      const user1 = new mongoose.Types.ObjectId();
 
-      const result = await getChatsByParticipants(['user1']);
+      const result = await getChatsByParticipants([user1]);
       expect(result).toHaveLength(2);
       expect(result).toEqual([mockChats[0], mockChats[1]]);
     });
 
     it('should return an empty array if no chats are found', async () => {
       mockingoose(ChatModel).toReturn([], 'find');
-
-      const result = await getChatsByParticipants(['user1']);
+      const user1 = new mongoose.Types.ObjectId();
+      const result = await getChatsByParticipants([user1]);
       expect(result).toHaveLength(0);
     });
 
     it('should return an empty array if chats is null', async () => {
       mockingoose(ChatModel).toReturn(null, 'find');
-
-      const result = await getChatsByParticipants(['user1']);
+      const user1 = new mongoose.Types.ObjectId();
+      const result = await getChatsByParticipants([user1]);
       expect(result).toHaveLength(0);
     });
 
     it('should return an empty array if a database error occurs', async () => {
       mockingoose(ChatModel).toReturn(new Error('database error'), 'find');
-
-      const result = await getChatsByParticipants(['user1']);
+      const user1 = new mongoose.Types.ObjectId();
+      const result = await getChatsByParticipants([user1]);
       expect(result).toHaveLength(0);
     });
   });
