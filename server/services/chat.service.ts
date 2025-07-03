@@ -17,12 +17,14 @@ export const saveChat = async (chatPayload: CreateChatPayload): Promise<ChatResp
     try {
       const messageIds: mongoose.Types.ObjectId[] = [];
 
+      if (!chatPayload.participants || chatPayload.participants.length === 0) {
+        return { error: 'Participants list is required' };
+      }
+
       if (chatPayload.messages && chatPayload.messages.length > 0) {
         const messageDocs = chatPayload.messages.map(msg => new MessageModel(msg));
-        await Promise.all(messageDocs.map(doc => doc.save()));
-        for (const doc of messageDocs) {
-          messageIds.push(doc._id);
-        }
+        const savedMessages = await Promise.all(messageDocs.map(doc => doc.save()));
+        messageIds.push(...savedMessages.map(saved => saved._id));
       }
 
       const newChat = new ChatModel({
@@ -106,8 +108,8 @@ export const getChatsByParticipants = async (p: mongoose.Types.ObjectId[]): Prom
     try {
       const chats = await ChatModel.find({
         participants: { $all: p },
-      });
-      return chats;
+      }).lean();
+      return chats || [];
     } catch (error) {
       return [];
     }

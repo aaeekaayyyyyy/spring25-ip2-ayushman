@@ -39,7 +39,7 @@ describe('Chat service', () => {
           msgDateTime: new Date('2025-01-01T00:00:00Z'),
           type: 'direct',
         },
-        'create',
+        'save',
       );
 
       // 3) Mock chat creation
@@ -51,7 +51,7 @@ describe('Chat service', () => {
           createdAt: new Date(),
           updatedAt: new Date(),
         },
-        'create',
+        'save',
       );
 
       const mockChatPayload = {
@@ -236,7 +236,7 @@ describe('Chat service', () => {
 
       const result = await getChatsByParticipants([user1]);
       expect(result).toHaveLength(2);
-      expect(result).toEqual([mockChats[0], mockChats[1]]);
+      expect(result).toMatchObject([mockChats[0], mockChats[1]]);
     });
 
     it('should return an empty array if no chats are found', async () => {

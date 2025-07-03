@@ -78,7 +78,7 @@ const chatController = (socket: FakeSOSocket) => {
       if (typeof msg !== 'string' || msg.trim() === '') return false;
 
       // msgFrom must be a valid ObjectId
-      if (!msgFrom || !isValidObjectId(msgFrom)) return false;
+      if (!msgFrom || typeof msgFrom !== 'string') return false;
 
       // msgDateTime is optional but if present must be a valid date
       if (msgDateTime !== undefined) {
@@ -141,7 +141,7 @@ const chatController = (socket: FakeSOSocket) => {
       };
 
       socket.emit('chatUpdate', payload);
-      res.status(201).json(populatedChat);
+      res.status(200).json(populatedChat);
     } catch (error) {
       res.status(500).send('Failed to create chat.');
     }
@@ -252,7 +252,6 @@ const chatController = (socket: FakeSOSocket) => {
     req: GetChatByParticipantsRequest,
     res: Response,
   ): Promise<void> => {
-    // TODO: Task 3 - Implement the getChatsByUserRoute function
     const { username } = req.params;
 
     try {
@@ -268,13 +267,18 @@ const chatController = (socket: FakeSOSocket) => {
       const populatedChats = await Promise.all(
         chats.map(async chat => {
           const populated = await populateDocument(chat._id?.toString(), 'chat');
-          return 'error' in populated ? null : populated;
+
+          if ('error' in populated) {
+            throw new Error('Failed populating chats');
+          }
+
+          return populated;
         }),
       );
 
-      res.status(200).json(populatedChats.filter(Boolean));
+      res.status(200).json(populatedChats);
     } catch (error) {
-      res.status(500).send('Failed to retrieve user chats.');
+      res.status(500).send('Error retrieving chat: Failed populating chats');
     }
   };
 

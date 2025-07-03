@@ -7,6 +7,7 @@ import MessageModel from '../../models/messages.model';
 import ChatModel from '../../models/chat.model';
 import { Chat } from '../../types/chat';
 import { Message } from '../../types/message';
+import UserModel from '../../models/users.model';
 
 /**
  * Spies on the service functions
@@ -30,15 +31,22 @@ describe('Chat Controller', () => {
     // TODO: Task 3 Write additional tests for the createChat endpoint
     it('should create a new chat successfully', async () => {
       const validChatPayload = {
-        participants: ['user1', 'user2'],
-        messages: [{ msg: 'Hello!', msgFrom: 'user1', msgDateTime: new Date('2025-01-01') }],
+        participants: [
+          new mongoose.Types.ObjectId().toString(),
+          new mongoose.Types.ObjectId().toString(),
+        ],
+        messages: [
+          {
+            msg: 'Hello!',
+            msgFrom: new mongoose.Types.ObjectId().toString(),
+          },
+        ],
       };
 
       const serializedPayload = {
         ...validChatPayload,
         messages: validChatPayload.messages.map(message => ({
           ...message,
-          msgDateTime: message.msgDateTime.toISOString(),
         })),
       };
 
@@ -215,7 +223,7 @@ describe('Chat Controller', () => {
     // TODO: Task 3 Write additional tests for the addParticipant endpoint
     it('should add a participant to an existing chat', async () => {
       const chatId = new mongoose.Types.ObjectId().toString();
-      const userId = new mongoose.Types.ObjectId().toString();
+      const participantId = new mongoose.Types.ObjectId().toString();
 
       const updatedChat: Chat = {
         _id: new mongoose.Types.ObjectId(),
@@ -226,8 +234,11 @@ describe('Chat Controller', () => {
       };
 
       addParticipantSpy.mockResolvedValue(updatedChat);
+      populateDocumentSpy.mockResolvedValue(updatedChat);
 
-      const response = await supertest(app).post(`/chat/${chatId}/addParticipant`).send({ userId });
+      const response = await supertest(app)
+        .post(`/chat/${chatId}/participant`)
+        .send({ participantId });
 
       expect(response.status).toBe(200);
 
@@ -239,12 +250,17 @@ describe('Chat Controller', () => {
         updatedAt: updatedChat.updatedAt?.toISOString(),
       });
 
-      expect(addParticipantSpy).toHaveBeenCalledWith(chatId, userId);
+      expect(addParticipantSpy).toHaveBeenCalledWith(chatId, participantId);
     });
   });
 
   describe('POST /chat/getChatsByUser/:username', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
     it('should return 200 with an array of chats', async () => {
+      const mockUserId = new mongoose.Types.ObjectId();
       const username = 'user1';
       const chats: Chat[] = [
         {
@@ -258,9 +274,14 @@ describe('Chat Controller', () => {
       getChatsByParticipantsSpy.mockResolvedValueOnce(chats);
       populateDocumentSpy.mockResolvedValueOnce(chats[0]);
 
+      jest.spyOn(UserModel, 'findOne').mockResolvedValue({
+        _id: mockUserId,
+        username,
+      });
+
       const response = await supertest(app).get(`/chat/getChatsByUser/${username}`);
 
-      expect(getChatsByParticipantsSpy).toHaveBeenCalledWith([username]);
+      expect(getChatsByParticipantsSpy).toHaveBeenCalledWith([mockUserId]);
       expect(populateDocumentSpy).toHaveBeenCalledWith(chats[0]._id?.toString(), 'chat');
       expect(response.status).toBe(200);
       expect(response.body).toMatchObject([
@@ -276,6 +297,7 @@ describe('Chat Controller', () => {
 
     it('should return 500 if populateDocument fails for any chat', async () => {
       const username = 'user1';
+      const mockUserId = new mongoose.Types.ObjectId();
       const chats: Chat[] = [
         {
           _id: new mongoose.Types.ObjectId(),
@@ -288,9 +310,14 @@ describe('Chat Controller', () => {
       getChatsByParticipantsSpy.mockResolvedValueOnce(chats);
       populateDocumentSpy.mockResolvedValueOnce({ error: 'Service error' });
 
+      jest.spyOn(UserModel, 'findOne').mockResolvedValue({
+        _id: mockUserId,
+        username,
+      });
+
       const response = await supertest(app).get(`/chat/getChatsByUser/${username}`);
 
-      expect(getChatsByParticipantsSpy).toHaveBeenCalledWith([username]);
+      expect(getChatsByParticipantsSpy).toHaveBeenCalledWith([mockUserId]);
       expect(populateDocumentSpy).toHaveBeenCalledWith(chats[0]._id?.toString(), 'chat');
       expect(response.status).toBe(500);
       expect(response.text).toBe('Error retrieving chat: Failed populating chats');
